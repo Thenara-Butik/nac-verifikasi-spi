@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react'
 // Pake proxy Vercel, bukan langsung ke supabase.co (biar gak ke-block DNS)
 async function fetchViaProxy(table) {
@@ -12,6 +11,7 @@ const UNITS = ["UID Jaya","UID Jabar","UID NTB","UID NTT","PLN NP","UIK Dwipanta
 const KOMPONEN_LIST = ['Komponen A','Komponen B','Komponen C','Komponen D','Komponen E']
 const KOMPONEN_SHORT = ['Komp A','Komp B','Komp C','Komp D','Komp E']
 
+// Fallback doang kalo Supabase kosong / offline. Tampilan pake auditors dari Supabase, bukan ini.
 const AUDITORS_DATA = [
   {name:"DIAN PUTRI MANULLANG", units:4, progress:75},
   {name:"LITANY MEGA PUTRI", units:4, progress:75},
@@ -23,6 +23,8 @@ const AUDITORS_DATA = [
   {name:"TRIAS PRASETYO", units:4, progress:50},
   {name:"DEWI AGHNIA PUTRI HANDAYANI", units:4, progress:75},
 ]
+
+const fmtRp = (n) => 'Rp' + Number(n||0).toLocaleString('id-ID');
 
 export default function App(){
   const [search,setSearch]=useState('')
@@ -61,7 +63,14 @@ export default function App(){
       if (kertas?.length) {
         const map = {};
         kertas.forEach(row => {
-          const id = row.id.includes('__TW') ? row.id : `${row.id}__TW3`;
+          // FIX: id dari hub = "UID Jaya__A" atau "UID Jaya__A__TW3"
+          // UI Vite pake kunci "UID Jaya__Komponen A__TW3", jadi harus dikonversi
+          const parts = (row.id || '').split('__');
+          const unitPart = parts[0];
+          let kompShort = parts[1] || 'A';
+          if (kompShort.startsWith('Komponen ')) kompShort = kompShort.replace('Komponen ', '');
+          const twPart = (parts[2] && parts[2].startsWith('TW')) ? parts[2] : 'TW3';
+          const id = `${unitPart}__Komponen ${kompShort}__${twPart}`;
           map[id] = { asersi: Number(row.asersi || 0), verifikasi: Number(row.verifikasi || 0) };
         });
         setKkData(map);
@@ -98,11 +107,25 @@ export default function App(){
     return [selKomp]
   },[selKomp])
 
+  // FIX: progres auditor dihitung dari kkData, bukan hardcoded AUDITORS_DATA
   const filteredAuditors = useMemo(()=>{
-    let list = AUDITORS_DATA.map((a,i)=>{
-      const real = auditors[i] || a
-      const assignedCount = Object.entries(assignMap).filter(([_,ls])=>ls.includes(real.name)).length || a.units
-      return {...a, name: real.name, units: assignedCount}
+    let list = auditors.map((a)=>{
+      const assignedUnits = Object.entries(assignMap).filter(([_,ls])=>ls.includes(a.name)).map(([u,_])=>u);
+      const assignedCount = assignedUnits.length || 0;
+      let total = 0, done = 0;
+      assignedUnits.forEach(u=>{
+        KOMPONEN_LIST.forEach(komp=>{
+          const twList = selTW==='TW ALL' ? ['TW1','TW2','TW3','TW4'] : [selTW];
+          twList.forEach(tw=>{
+            const d = kkData[`${u}__${komp}__${tw}`];
+            if(!d) return;
+            total++;
+            if((Number(d.asersi||0)===0 && Number(d.verifikasi||0)===0) || Number(d.verifikasi||0)>0) done++;
+          });
+        });
+      });
+      const progress = total>0 ? Math.round(done/total*100) : 0;
+      return { name: a.name, nip: a.nip||'', units: assignedCount, progress };
     })
     if(selAuditor!=='Semua Auditor'){
       list = list.filter(a=>a.name===selAuditor)
@@ -118,7 +141,64 @@ export default function App(){
       else if(selStatus==='Progres') list = list.filter(a=>a.progress>0 && a.progress<100)
     }
     return list
-  },[auditors,assignMap,selAuditor,selAvg,selStatus])
+  },[auditors,assignMap,selAuditor,selAvg,selStatus,kkData,selTW])
+
+  // FIX: KPI dihitung dari kkData, bukan hardcoded Rp21T / Rp5T
+  const kpi = useMemo(()=>{
+    let asersi=0, verifikasi=0, totalCell=0, doneCell=0;
+    const twList = selTW==='TW ALL' ? ['TW1','TW2','TW3','TW4'] : [selTW];
+    filteredUnits.forEach(u=>{
+      filteredKomp.forEach(komp=>{
+        twList.forEach(tw=>{
+          const d = kkData[`${u}__${komp}__${tw}`];
+          if(!d) return;
+          asersi += Number(d.asersi||0);
+          verifikasi += Number(d.verifikasi||0);
+          totalCell++;
+          if((Number(d.asersi||0)===0 && Number(d.verifikasi||0)===0) || Number(d.verifikasi||0)>0) doneCell++;
+        });
+      });
+    });
+    const selisih = asersi - verifikasi;
+    const unitDone = filteredUnits.filter(u=>{
+      // unit dianggap selesai kalo semua komponen di TW yang dipilih selesai
+      let t=0, dn=0;
+      filteredKomp.forEach(komp=>{
+        twList.forEach(tw=>{
+          const d = kkData[`${u}__${komp}__${tw}`];
+          if(!d) return;
+          t++;
+          if((Number(d.asersi||0)===0 && Number(d.verifikasi||0)===0) || Number(d.verifikasi||0)>0) dn++;
+        });
+      });
+      return t>0 && dn===t;
+    }).length;
+    const pct = totalCell>0 ? Math.round(doneCell/totalCell*100) : 0;
+    return { asersi, verifikasi, selisih, totalCell, doneCell, unitDone, pct };
+  },[kkData, filteredUnits, filteredKomp, selTW])
+
+  // FIX: Chart dihitung dari kkData, bukan [{a:45,v:35}...] mati
+  const chartData = useMemo(()=>{
+    const twList = selTW==='TW ALL' ? ['TW1','TW2','TW3','TW4'] : [selTW];
+    return KOMPONEN_LIST.map(komp=>{
+      let a=0, v=0;
+      filteredUnits.forEach(u=>{
+        twList.forEach(tw=>{
+          const d = kkData[`${u}__${komp}__${tw}`];
+          if(!d) return;
+          a += Number(d.asersi||0);
+          v += Number(d.verifikasi||0);
+        });
+      });
+      return { komp, a, v, selisih: a-v };
+    });
+  },[kkData, filteredUnits, selTW]);
+
+  const maxChart = useMemo(()=>{
+    let m = 1;
+    chartData.forEach(d=>{ m = Math.max(m, d.a, d.v, d.selisih); });
+    return m;
+  },[chartData]);
 
   const downloadExcel=()=>{
     let rows=[['UNIT','Komponen','TW','Asersi','Verifikasi','Selisih','Auditor','Filter: '+selUnit+'|'+selKomp+'|'+selAuditor+'|'+selTW]]
@@ -163,7 +243,7 @@ export default function App(){
       .card-dark{background:#1e293b;color:white;border-radius:16px;padding:16px}
       .label{font-size:10px;letter-spacing:0.1em;color:#94a3b8;text-transform:uppercase}
       .value{font-weight:700;font-size:17px;margin-top:8px}
-      .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+      .chart-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
       .bar-row{display:flex;align-items:end;gap:12px;height:200px;padding:0 12px}
       .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px}
       .bars{display:flex;gap:4px;align-items:end;height:160px;width:100%;justify-content:center}
@@ -239,25 +319,25 @@ export default function App(){
           {activeMenu==='Dashboard' && (
             <>
               <div className="kpi-grid">
-                <div className="card"><div className="label">Total Nilai Asersi</div><div className="value">Rp21.807.815.839.287</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>{filteredUnits.length} unit • 245 baris • {selTW}</div></div>
-                <div className="card"><div className="label">Total Verifikasi</div><div className="value">Rp5.473.450.209.464</div><div style={{fontSize:'10px',color:'#059669',marginTop:'4px'}}>Terverifikasi 0 unit • {selAuditor}</div></div>
-                <div className="card"><div className="label">Total Selisih</div><div className="value" style={{color:'#3b82f6'}}>Rp16.334.365.629.823</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>Asersi - Verifikasi • {selKomp}</div></div>
-                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Unit Selesai / Progres Verifikasi</div><div style={{fontWeight:'700',marginTop:'8px'}}>Rp0 <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{filteredUnits.filter(u=>false).length}/{filteredUnits.length}</span></div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:'0%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
+                <div className="card"><div className="label">Total Nilai Asersi</div><div className="value">{fmtRp(kpi.asersi)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>{filteredUnits.length} unit • {kpi.totalCell} baris • {selTW}</div></div>
+                <div className="card"><div className="label">Total Verifikasi</div><div className="value">{fmtRp(kpi.verifikasi)}</div><div style={{fontSize:'10px',color:'#059669',marginTop:'4px'}}>Terverifikasi {kpi.unitDone} unit • {selAuditor}</div></div>
+                <div className="card"><div className="label">Total Selisih</div><div className="value" style={{color:'#3b82f6'}}>{fmtRp(kpi.selisih)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>Asersi - Verifikasi • {selKomp}</div></div>
+                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Unit Selesai / Progres Verifikasi</div><div style={{fontWeight:'700',marginTop:'8px'}}>{kpi.pct}% <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{kpi.unitDone}/{filteredUnits.length}</span></div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:kpi.pct+'%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
               </div>
 
               <div className="chart-grid">
                 <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Asersi vs Verifikasi per Komponen A-E • {selTW}</div>
                   <div className="bar-row">
-                    {[{a:45,v:35},{a:8,v:2},{a:80,v:1},{a:1,v:0},{a:0,v:0}].map((d,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar1" style={{height:d.a+'%'}}></div><div className="bar2" style={{height:d.v+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
+                    {chartData.map((d,i)=>(
+                      <div key={i} className="bar-col"><div className="bars"><div className="bar1" style={{height:(maxChart>0? (d.a/maxChart*100):0)+'%'}}></div><div className="bar2" style={{height:(maxChart>0? (d.v/maxChart*100):0)+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px'}}><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#1e293b',borderRadius:'2px'}}></div><span style={{fontSize:'11px'}}>Asersi</span></div><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#3b82f6',borderRadius:'2px'}}></div><span style={{fontSize:'11px',color:'#3b82f6'}}>Verifikasi</span></div></div>
                 </div>
                 <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Total Selisih per Komponen • {selUnit}</div>
                   <div className="bar-row">
-                    {[15,7,78,0,0].map((v,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar-single" style={{height: v? v+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
+                    {chartData.map((d,i)=>(
+                      <div key={i} className="bar-col"><div className="bars"><div className="bar-single" style={{height: d.selisih>0 ? (d.selisih/maxChart*100)+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{height:'20px'}}></div>
