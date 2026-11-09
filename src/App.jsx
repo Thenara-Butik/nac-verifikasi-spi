@@ -366,7 +366,7 @@ export default function App(){
             <div style={{fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>{units.length} Unit • {auditors.length} Auditor</div>
             <div style={{fontSize:'11px',fontWeight:'600',marginTop:'4px'}}>{filteredUnits.length} Unit • {filteredAuditors.length} Auditor</div>
             <div style={{height:'4px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'8px'}}><div style={{height:'4px',width:'40%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div>
-            <div style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',marginTop:'4px'}}>Filter aktif: {selUnit!=='Semua Unit'||selAuditor!=='Semua Auditor'? 'Ya':'Tidak'}</div>
+
           </div>
         </div>
         <div style={{padding:'12px',borderTop:'1px solid rgba(255,255,255,0.1)'}}>
@@ -393,10 +393,10 @@ export default function App(){
           {activeMenu==='Dashboard' && (
             <>
               <div className="kpi-grid">
-                <div className="card"><div className="label">Total Nilai Asersi</div><div className="value">{fmtRp(kpi.asersi)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>{filteredUnits.length} unit • {kpi.totalCell} baris • {selTW}</div></div>
-                <div className="card"><div className="label">Total Verifikasi</div><div className="value">{fmtRp(kpi.verifikasi)}</div><div style={{fontSize:'10px',color:'#059669',marginTop:'4px'}}>Terverifikasi {kpi.unitDone} unit • {selAuditor}</div></div>
+                <div className="card"><div className="label">Total Nilai Asersi</div><div className="value">{fmtRp(kpi.asersi)}</div></div>
+                <div className="card"><div className="label">Total Verifikasi</div><div className="value">{fmtRp(kpi.verifikasi)}</div></div>
                 <div className="card"><div className="label">Total Selisih</div><div className="value" style={{color:'#3b82f6'}}>{fmtRp(kpi.selisih)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>Asersi - Verifikasi • {selKomp}</div></div>
-                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Pencapaian Verifikasi — Rata-rata Auditor</div><div style={{fontWeight:'700',marginTop:'8px'}}>{kpi.pct}% <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{kpi.auditorCount} auditor</span></div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.6)',marginTop:'4px'}}>Per komponen: selesai kalau verifikasi terisi, atau asersi 0 & verifikasi 0 = 100%. Unit selesai: {kpi.unitDone}/{filteredUnits.length} unit</div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:kpi.pct+'%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
+                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Pencapaian Verifikasi — Rata-rata Auditor</div><div style={{fontWeight:'700',marginTop:'8px'}}>{kpi.pct}% <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{kpi.auditorCount} auditor</span></div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:kpi.pct+'%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
               </div>
 
               <div className="chart-grid">
