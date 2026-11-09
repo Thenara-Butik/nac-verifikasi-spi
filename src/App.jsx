@@ -55,6 +55,7 @@ export default function App(){
   const [assignMap,setAssignMap]=useState(()=>{
     try{ const s=localStorage.getItem('nac_assign_final_v1'); return s?JSON.parse(s):{} }catch{return {}}
   })
+  const [showSidebar,setShowSidebar]=useState(false)
   const [showKelola,setShowKelola]=useState(false)
   const [showAssign,setShowAssign]=useState(false)
   const [newAudName,setNewAudName]=useState('')
@@ -347,20 +348,47 @@ export default function App(){
       input.num:focus{outline:none;border-color:#3b82f6;background:white}
       .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:50}
       .modal{background:white;border-radius:16px;width:480px;padding:20px;max-height:80vh;overflow:auto}
+      .hamburger{display:none}
+      .sidebar-overlay{display:none}
+      .sidebar-close{display:none}
+      @media (max-width:1024px){
+        .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:60;box-shadow:4px 0 24px rgba(0,0,0,.25);width:260px;max-width:85vw}
+        .sidebar.open{transform:translateX(0)}
+        .sidebar.open .sidebar-close{display:flex}
+        .sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55}
+        .main{margin-left:0!important}
+        .hamburger{display:flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:36px;border:1px solid #e9ecf1;background:white;border-radius:999px;font-size:18px;cursor:pointer}
+        .topbar{flex-wrap:wrap;gap:6px;padding:8px}
+        .topbar .search{width:120px}
+        .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px}
+        .chart-grid{grid-template-columns:1fr!important}
+        .auditor-grid{grid-template-columns:1fr!important}
+        .card,.card-dark{padding:12px}
+        .value{font-size:15px}
+        .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+        table{min-width:720px}
+        input.num{width:100px}
+      }
+      @media (max-width:560px){
+        .kpi-grid{grid-template-columns:1fr!important}
+        .bar-row{padding:0 4px}
+      }
     `}</style>
     <div className="layout">
-      <div className="sidebar">
+      {showSidebar && <div className="sidebar-overlay" onClick={()=>setShowSidebar(false)}></div>}
+      <div className={`sidebar ${showSidebar?'open':''}`}>
         <div>
           <div style={{padding:'16px',borderBottom:'1px solid rgba(255,255,255,0.1)',display:'flex',gap:'8px',alignItems:'center'}}>
+            <button className="sidebar-close" onClick={()=>setShowSidebar(false)} style={{marginLeft:'auto',width:'28px',height:'28px',borderRadius:'999px',border:'none',background:'rgba(255,255,255,0.15)',color:'white',cursor:'pointer',alignItems:'center',justifyContent:'center'}}>✕</button>
             <div style={{width:'32px',height:'32px',background:'rgba(255,255,255,0.1)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'700',fontSize:'11px'}}>NAC</div>
             <div><div style={{fontWeight:'700',fontSize:'12px'}}>NAC VERIFIKASI</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.5)',letterSpacing:'0.1em'}}>SPI SYSTEM</div></div>
           </div>
           <div style={{padding:'8px'}}>
-            <button onClick={()=>setActiveMenu('Dashboard')} className={`menu ${activeMenu==='Dashboard'?'active':''}`}><span>Dashboard</span><span style={{fontSize:'10px',background:'rgba(255,255,255,0.1)',padding:'2px 8px',borderRadius:'999px'}}>KPI</span></button>
-            <button onClick={()=>setActiveMenu('Kertas Kerja')} className={`menu ${activeMenu==='Kertas Kerja'?'active':''}`}><span>Kertas Kerja</span></button>
-            <button onClick={()=>setActiveMenu('Progres Auditor')} className={`menu ${activeMenu==='Progres Auditor'?'active':''}`}><span>Progres Auditor</span><span style={{fontSize:'10px',background:'rgba(255,255,255,0.1)',padding:'2px 8px',borderRadius:'999px'}}>{filteredAuditors.filter(a=>a.progress>0).length}</span></button>
-            <button onClick={()=>setShowKelola(true)} className="menu"><span>Kelola Auditor</span></button>
-            <button onClick={()=>setShowAssign(true)} className="menu"><span>Assign Auditor</span></button>
+            <button onClick={()=>{setActiveMenu('Dashboard');setShowSidebar(false)}} className={`menu ${activeMenu==='Dashboard'?'active':''}`}><span>Dashboard</span><span style={{fontSize:'10px',background:'rgba(255,255,255,0.1)',padding:'2px 8px',borderRadius:'999px'}}>KPI</span></button>
+            <button onClick={()=>{setActiveMenu('Kertas Kerja');setShowSidebar(false)}} className={`menu ${activeMenu==='Kertas Kerja'?'active':''}`}><span>Kertas Kerja</span></button>
+            <button onClick={()=>{setActiveMenu('Progres Auditor');setShowSidebar(false)}} className={`menu ${activeMenu==='Progres Auditor'?'active':''}`}><span>Progres Auditor</span><span style={{fontSize:'10px',background:'rgba(255,255,255,0.1)',padding:'2px 8px',borderRadius:'999px'}}>{filteredAuditors.filter(a=>a.progress>0).length}</span></button>
+            <button onClick={()=>{setShowKelola(true);setShowSidebar(false)}} className="menu"><span>Kelola Auditor</span></button>
+            <button onClick={()=>{setShowAssign(true);setShowSidebar(false)}} className="menu"><span>Assign Auditor</span></button>
           </div>
           <div style={{margin:'16px 12px',padding:'12px',background:'rgba(255,255,255,0.05)',borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)'}}>
             <div style={{fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>{units.length} Unit • {auditors.length} Auditor</div>
@@ -377,6 +405,7 @@ export default function App(){
 
       <div className="main">
         <div className="topbar">
+          <button className="hamburger" onClick={()=>setShowSidebar(true)}>☰</button>
           <div style={{position:'relative'}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari UID Jaya" className="search"/><span style={{position:'absolute',left:'8px',top:'7px',color:'#94a3b8',fontSize:'12px'}}>⌕</span></div>
           <select value={selUnit} onChange={e=>setSelUnit(e.target.value)} className="pill"><option>Semua Unit</option>{units.map(u=><option key={u}>{u}</option>)}</select>
           <select value={selKomp} onChange={e=>setSelKomp(e.target.value)} className="pill"><option>Semua Komponen</option>{KOMPONEN_LIST.map(k=><option key={k}>{k}</option>)}</select>
