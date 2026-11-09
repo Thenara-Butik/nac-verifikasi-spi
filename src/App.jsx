@@ -181,6 +181,10 @@ export default function App(){
       });
     });
     const selisih = asersi - verifikasi;
+    // RUMUS BENAR: per sel, selesai = verifikasi terisi (verifikasi>0) ATAU asersi=0 & verifikasi=0.
+    // BUKAN verifikasi dibagi asersi angkanya. Angka Rp-nya tidak dipakai buat %.
+    // Per auditor: % per Komponen A-E dulu, lalu rata-rata 5 komponen.
+    // Overall = rata-rata % semua auditor (bobot sama, unit yang tidak di-assign tidak ikut).
     const unitDone = filteredUnits.filter(u=>{
       // unit dianggap selesai kalo semua komponen di TW yang dipilih selesai
       let t=0, dn=0;
@@ -194,9 +198,34 @@ export default function App(){
       });
       return t>0 && dn===t;
     }).length;
-    const pct = totalCell>0 ? Math.round(doneCell/totalCell*100) : 0;
-    return { asersi, verifikasi, selisih, totalCell, doneCell, unitDone, pct };
-  },[kkData, filteredUnits, filteredKomp, selTW])
+    // pct lama (doneCell/totalCell) JANGAN dipakai buat kartu hitam — itu bukan rumus auditor.
+    const cellPct = totalCell>0 ? Math.round(doneCell/totalCell*100) : 0;
+    // Overall = rata-rata progres auditor yang terfilter (sudah per-komponen di filteredAuditors)
+    // filteredAuditors dihitung di bawah, jadi di sini kita hitung ulang dari auditors + assignMap biar tidak circular.
+    let auditorSum = 0, auditorCount = 0;
+    auditors.forEach(a=>{
+      if(selAuditor!=='Semua Auditor' && a.name!==selAuditor) return;
+      const assignedUnits = Object.entries(assignMap).filter(([_,ls])=>ls.includes(a.name)).map(([u,_])=>u).filter(u=>filteredUnits.includes(u));
+      if(!assignedUnits.length) return;
+      let kompSum = 0, kompCount = 0;
+      KOMPONEN_LIST.forEach(komp=>{
+        let tot = 0, dn = 0;
+        assignedUnits.forEach(u=>{
+          twList.forEach(tw=>{
+            const d = kkData[`${u}__${komp}__${tw}`];
+            // Sel hilang = dianggap 0/0 = 100% (sesuai aturan hub: tidak ada yang perlu diverifikasi)
+            const asr = Number(d?.asersi||0), ver = Number(d?.verifikasi||0);
+            tot++;
+            if((asr===0 && ver===0) || ver>0) dn++;
+          });
+        });
+        if(tot>0){ kompSum += dn/tot*100; kompCount++; }
+      });
+      if(kompCount>0){ auditorSum += kompSum/kompCount; auditorCount++; }
+    });
+    const pct = auditorCount>0 ? Math.round(auditorSum/auditorCount) : 0;
+    return { asersi, verifikasi, selisih, totalCell, doneCell, unitDone, pct, cellPct, auditorCount };
+  },[kkData, filteredUnits, filteredKomp, selTW, auditors, assignMap, selAuditor])
 
   // FIX: Chart dihitung dari kkData, bukan [{a:45,v:35}...] mati
   const chartData = useMemo(()=>{
@@ -367,7 +396,7 @@ export default function App(){
                 <div className="card"><div className="label">Total Nilai Asersi</div><div className="value">{fmtRp(kpi.asersi)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>{filteredUnits.length} unit • {kpi.totalCell} baris • {selTW}</div></div>
                 <div className="card"><div className="label">Total Verifikasi</div><div className="value">{fmtRp(kpi.verifikasi)}</div><div style={{fontSize:'10px',color:'#059669',marginTop:'4px'}}>Terverifikasi {kpi.unitDone} unit • {selAuditor}</div></div>
                 <div className="card"><div className="label">Total Selisih</div><div className="value" style={{color:'#3b82f6'}}>{fmtRp(kpi.selisih)}</div><div style={{fontSize:'10px',color:'#64748b',marginTop:'4px'}}>Asersi - Verifikasi • {selKomp}</div></div>
-                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Unit Selesai / Progres Verifikasi</div><div style={{fontWeight:'700',marginTop:'8px'}}>{kpi.pct}% <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{kpi.unitDone}/{filteredUnits.length}</span></div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:kpi.pct+'%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
+                <div className="card-dark"><div className="label" style={{color:'rgba(255,255,255,0.5)'}}>Pencapaian Verifikasi — Rata-rata Auditor</div><div style={{fontWeight:'700',marginTop:'8px'}}>{kpi.pct}% <span style={{fontWeight:'400',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{kpi.auditorCount} auditor</span></div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.6)',marginTop:'4px'}}>Per komponen: selesai kalau verifikasi terisi, atau asersi 0 & verifikasi 0 = 100%. Unit selesai: {kpi.unitDone}/{filteredUnits.length} unit</div><div style={{height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'12px'}}><div style={{height:'6px',width:kpi.pct+'%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div></div>
               </div>
 
               <div className="chart-grid">
