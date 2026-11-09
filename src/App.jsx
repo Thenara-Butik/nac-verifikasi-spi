@@ -5,6 +5,16 @@ async function fetchViaProxy(table) {
   if (!r.ok) throw new Error('Proxy gagal: ' + r.status);
   return await r.json();
 }
+async function saveViaProxy(table, rows) {
+  const r = await fetch(`/api/supabase?table=${table}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rows),
+  });
+  const txt = await r.text();
+  if (!r.ok) throw new Error('Simpan gagal: ' + r.status + ' ' + txt.slice(0, 300));
+  try { return JSON.parse(txt); } catch { return txt; }
+}
 
 const UNITS = ["UID Jaya","UID Jabar","UID NTB","UID NTT","PLN NP","UIK Dwipantara","Pusdiklat","Pusharlis","Pusmanpro","Puslitbang","PLN E","UID Kalbar","Kantor Pusat","Ex Pembangkit","PLN Batam","UID Banten","UID S2JB","UIW Babel","UID Lampung","Nusa Daya","UID Sumut","UID RKR","UID Kaltimra","PLN EMI","UID Jatim","UID Jateng","Pusertif","PLN EPI","UIP3B Sumatera","UIP3B Kalimantan","UIP3B Sulawesi","UP2B Jamali","PLN MCTN","UIT JBB","UIT JBT","UIT JBTB","ES","UID Kalselteng","UID Sulselrabar","UID Sulutenggo","PLN IP","UID Bali","UID MMU","UID P2B","PLN Icon","UID DIY","UIK TJB","UID Sumbar","UID NAD"]
 
@@ -49,6 +59,10 @@ export default function App(){
   const [showAssign,setShowAssign]=useState(false)
   const [newAudName,setNewAudName]=useState('')
   const [newAudNIP,setNewAudNIP]=useState('')
+  // Save Kertas Kerja ke Supabase
+  const [isDirty,setIsDirty]=useState(false)
+  const [isSaving,setIsSaving]=useState(false)
+  const [saveStatus,setSaveStatus]=useState('')
   // Pagination Kertas Kerja: 25 per halaman
   const [kkPage,setKkPage]=useState(1)
   const KK_PAGE_SIZE = 25
@@ -232,7 +246,31 @@ export default function App(){
   const handleKK = (unit,komp,tw,field,val)=>{
     const key=`${unit}__${komp}__${tw}`
     setKkData(prev=>({...prev,[key]:{...prev[key],[field]:Number(val)||0}}))
+    setIsDirty(true)
+    setSaveStatus('● Belum disimpan — klik Simpan biar ke Supabase')
   }
+
+  const saveKkToSupabase = async ()=>{
+    if(isSaving) return;
+    setIsSaving(true); setSaveStatus('Menyimpan ke Supabase...');
+    try{
+      // Kembalikan kunci Vite "UID Jaya__Komponen A__TW3" ke id hub "UID Jaya__A" (TW3) / "UID Jaya__A__TW1" (TW lain)
+      const rows = Object.entries(kkData).map(([key,d])=>{
+        const parts = key.split('__');
+        const unit = parts[0];
+        let kompShort = (parts[1]||'Komponen A').replace('Komponen ','');
+        const tw = parts[2]||'TW3';
+        const id = tw==='TW3' ? `${unit}__${kompShort}` : `${unit}__${kompShort}__${tw}`;
+        return { id, unit, komponen: kompShort, asersi: Number(d.asersi||0), verifikasi: Number(d.verifikasi||0) };
+      });
+      if(!rows.length) throw new Error('Tidak ada data untuk disimpan');
+      await saveViaProxy('nac_kertas', rows);
+      setIsDirty(false);
+      setSaveStatus('✅ Tersimpan ke Supabase — ' + new Date().toLocaleTimeString('id-ID') + ' • ' + rows.length + ' baris');
+    }catch(e){
+      setSaveStatus('❌ Gagal simpan: ' + e.message + ' — data masih aman di browser ini');
+    }finally{ setIsSaving(false); }
+  };
 
   return (
     <>
@@ -369,7 +407,7 @@ export default function App(){
 
           {activeMenu==='Kertas Kerja' && (
             <div className="card" style={{padding:'0',overflow:'hidden'}}>
-              <div style={{padding:'16px',borderBottom:'1px solid #e9ecf1',display:'flex',justifyContent:'space-between',alignItems:'center'}}><div style={{fontWeight:'600',fontSize:'14px'}}>Kertas Kerja — {selTW} • {filteredUnits.length} Unit • {selKomp} • {selAuditor}</div><button onClick={downloadExcel} className="btn">⬇ Download Excel ({filteredUnits.length} unit)</button></div>
+              <div style={{padding:'16px',borderBottom:'1px solid #e9ecf1',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}><div style={{fontWeight:'600',fontSize:'14px'}}>Kertas Kerja — {selTW} • {filteredUnits.length} Unit • {selKomp} • {selAuditor}</div><div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}><span style={{fontSize:'11px',color:isDirty?'#d97706':'#059669'}}>{saveStatus || (isDirty ? '● Ada perubahan belum disimpan' : 'Semua tersimpan')}</span><button onClick={saveKkToSupabase} disabled={isSaving} className="btn btn-primary" style={{opacity:isSaving?0.6:1}}>{isSaving?'⏳ Menyimpan...':'💾 Simpan Kertas Kerja'}</button><button onClick={downloadExcel} className="btn">⬇ Download Excel ({filteredUnits.length} unit)</button></div></div>
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>UNIT (klik filter)</th><th>KOMP</th><th>TW</th><th style={{textAlign:'right'}}>A-ASR</th><th style={{textAlign:'right'}}>A-VER</th><th style={{textAlign:'right'}}>A-SEL</th><th>AUDITOR (filter aktif)</th></tr></thead>
@@ -401,7 +439,9 @@ export default function App(){
                   return (
                     <div style={{padding:'12px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                       <div style={{fontSize:'11px',color:'#64748b'}}>Menampilkan {filteredUnits.length===0?0:startIdx+1}-{endIdx} dari {filteredUnits.length} unit • 25 per halaman</div>
-                      <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                      <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}}>
+                        <button onClick={saveKkToSupabase} disabled={isSaving} className="btn btn-primary" style={{opacity:isSaving?0.6:1}}>{isSaving?'⏳ Menyimpan...':'💾 Simpan Kertas Kerja'}</button>
+                        <span style={{fontSize:'11px',color:isDirty?'#d97706':'#059669'}}>{saveStatus}</span>
                         <button className="btn" disabled={safePage<=1} onClick={()=>setKkPage(safePage-1)} style={{opacity:safePage<=1?0.5:1}}>‹ Sebelumnya</button>
                         <span style={{fontSize:'11px',color:'#334155'}}>Halaman {safePage} dari {totalPages}</span>
                         <button className="btn" disabled={safePage>=totalPages} onClick={()=>setKkPage(safePage+1)} style={{opacity:safePage>=totalPages?0.5:1}}>Berikutnya ›</button>
