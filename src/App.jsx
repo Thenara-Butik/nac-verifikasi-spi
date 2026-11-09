@@ -49,6 +49,11 @@ export default function App(){
   const [showAssign,setShowAssign]=useState(false)
   const [newAudName,setNewAudName]=useState('')
   const [newAudNIP,setNewAudNIP]=useState('')
+  // Pagination Kertas Kerja: 25 per halaman
+  const [kkPage,setKkPage]=useState(1)
+  const KK_PAGE_SIZE = 25
+  const fmtNum = (n) => { const v = Number(n||0); return v ? v.toLocaleString('id-ID') : ''; };
+  const parseNum = (s) => { const v = Number(String(s||'').replace(/\./g,'').replace(/[^0-9-]/g,'')); return isNaN(v) ? 0 : v; };
 
   useEffect(()=>{ localStorage.setItem('nac_auditors_final_v1',JSON.stringify(auditors)) },[auditors])
   useEffect(()=>{ localStorage.setItem('nac_assign_final_v1',JSON.stringify(assignMap)) },[assignMap])
@@ -106,6 +111,8 @@ export default function App(){
     if(selKomp==='Semua Komponen') return KOMPONEN_LIST
     return [selKomp]
   },[selKomp])
+
+  useEffect(()=>{ setKkPage(1); },[search, selUnit, selKomp, selAuditor, selTW]);
 
   // FIX: progres auditor dihitung dari kkData, bukan hardcoded AUDITORS_DATA
   const filteredAuditors = useMemo(()=>{
@@ -367,20 +374,41 @@ export default function App(){
                 <table>
                   <thead><tr><th>UNIT (klik filter)</th><th>KOMP</th><th>TW</th><th style={{textAlign:'right'}}>A-ASR</th><th style={{textAlign:'right'}}>A-VER</th><th style={{textAlign:'right'}}>A-SEL</th><th>AUDITOR (filter aktif)</th></tr></thead>
                   <tbody>
-                    {filteredUnits.slice(0,15).map(u=> filteredKomp.map(komp=> (selTW==='TW ALL'? ['TW1','TW2','TW3','TW4'] : [selTW]).map(tw=>{
-                      const key=`${u}__${komp}__${tw}`
-                      const d=kkData[key]||{}
-                      return (
-                        <tr key={key}><td style={{cursor:'pointer'}} onClick={()=>setSelUnit(u)}>{u}</td><td>{komp}</td><td>{tw}</td>
-                        <td style={{textAlign:'right'}}><input type="number" className="num" value={d.asersi||''} onChange={e=>handleKK(u,komp,tw,'asersi',e.target.value)} placeholder="0"/></td>
-                        <td style={{textAlign:'right'}}><input type="number" className="num ver" value={d.verifikasi||''} onChange={e=>handleKK(u,komp,tw,'verifikasi',e.target.value)} placeholder="0"/></td>
-                        <td style={{textAlign:'right',fontFamily:'monospace',color:'#2563eb'}}>Rp{((d.asersi||0)-(d.verifikasi||0)).toLocaleString('id-ID')}</td>
-                        <td style={{fontSize:'11px',color:'#64748b'}}><span style={{cursor:'pointer'}} onClick={()=>{ if(assignMap[u]?.[0]) setSelAuditor(assignMap[u][0]) }}>{(assignMap[u]||[]).join(', ')|| '— klik Assign'}</span></td></tr>
-                      )
-                    })))}
+                    {(() => {
+                      const totalPages = Math.max(1, Math.ceil(filteredUnits.length / KK_PAGE_SIZE));
+                      const safePage = Math.min(kkPage, totalPages);
+                      const startIdx = (safePage - 1) * KK_PAGE_SIZE;
+                      const pageUnits = filteredUnits.slice(startIdx, startIdx + KK_PAGE_SIZE);
+                      return pageUnits.map(u=> filteredKomp.map(komp=> (selTW==='TW ALL'? ['TW1','TW2','TW3','TW4'] : [selTW]).map(tw=>{
+                        const key=`${u}__${komp}__${tw}`
+                        const d=kkData[key]||{}
+                        return (
+                          <tr key={key}><td style={{cursor:'pointer'}} onClick={()=>setSelUnit(u)}>{u}</td><td>{komp}</td><td>{tw}</td>
+                          <td style={{textAlign:'right'}}><input type="text" inputMode="numeric" className="num" value={fmtNum(d.asersi)} onChange={e=>handleKK(u,komp,tw,'asersi',parseNum(e.target.value))} placeholder="0"/></td>
+                          <td style={{textAlign:'right'}}><input type="text" inputMode="numeric" className="num ver" value={fmtNum(d.verifikasi)} onChange={e=>handleKK(u,komp,tw,'verifikasi',parseNum(e.target.value))} placeholder="0"/></td>
+                          <td style={{textAlign:'right',fontFamily:'monospace',color:'#2563eb'}}>Rp{((d.asersi||0)-(d.verifikasi||0)).toLocaleString('id-ID')}</td>
+                          <td style={{fontSize:'11px',color:'#64748b'}}><span style={{cursor:'pointer'}} onClick={()=>{ if(assignMap[u]?.[0]) setSelAuditor(assignMap[u][0]) }}>{(assignMap[u]||[]).join(', ')|| '— klik Assign'}</span></td></tr>
+                        )
+                      })))
+                    })()}
                   </tbody>
                 </table>
-                {filteredUnits.length>15 && <div style={{padding:'12px',textAlign:'center',fontSize:'11px',color:'#64748b'}}>Menampilkan 15 unit pertama dari {filteredUnits.length} unit terfilter. Ketik di search atau pilih Semua Unit = {selUnit} untuk fokus.</div>}
+                {(() => {
+                  const totalPages = Math.max(1, Math.ceil(filteredUnits.length / KK_PAGE_SIZE));
+                  const safePage = Math.min(kkPage, totalPages);
+                  const startIdx = (safePage - 1) * KK_PAGE_SIZE;
+                  const endIdx = Math.min(startIdx + KK_PAGE_SIZE, filteredUnits.length);
+                  return (
+                    <div style={{padding:'12px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                      <div style={{fontSize:'11px',color:'#64748b'}}>Menampilkan {filteredUnits.length===0?0:startIdx+1}-{endIdx} dari {filteredUnits.length} unit • 25 per halaman</div>
+                      <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                        <button className="btn" disabled={safePage<=1} onClick={()=>setKkPage(safePage-1)} style={{opacity:safePage<=1?0.5:1}}>‹ Sebelumnya</button>
+                        <span style={{fontSize:'11px',color:'#334155'}}>Halaman {safePage} dari {totalPages}</span>
+                        <button className="btn" disabled={safePage>=totalPages} onClick={()=>setKkPage(safePage+1)} style={{opacity:safePage>=totalPages?0.5:1}}>Berikutnya ›</button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
