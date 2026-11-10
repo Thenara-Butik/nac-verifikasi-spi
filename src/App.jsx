@@ -173,7 +173,7 @@ export default function App(){
     let asersi=0, verifikasi=0, totalCell=0, doneCell=0;
     const twList = selTW==='TW ALL' ? ['TW1','TW2','TW3','TW4'] : [selTW];
     filteredUnits.forEach(u=>{
-      filteredKomp.forEach(komp=>{
+      filteredKategori.forEach(komp=>{
         twList.forEach(tw=>{
           const d = kkData[`${u}__${komp}__${tw}`];
           if(!d) return;
@@ -192,7 +192,7 @@ export default function App(){
     const unitDone = filteredUnits.filter(u=>{
       // unit dianggap selesai kalo semua komponen di TW yang dipilih selesai
       let t=0, dn=0;
-      filteredKomp.forEach(komp=>{
+      filteredKategori.forEach(komp=>{
         twList.forEach(tw=>{
           const d = kkData[`${u}__${komp}__${tw}`];
           if(!d) return;
@@ -229,7 +229,7 @@ export default function App(){
     });
     const pct = auditorCount>0 ? Math.round(auditorSum/auditorCount) : 0;
     return { asersi, verifikasi, selisih, totalCell, doneCell, unitDone, pct, cellPct, auditorCount };
-  },[kkData, filteredUnits, filteredKomp, selTW, auditors, assignMap, selAuditor])
+  },[kkData, filteredUnits, filteredKategori, selTW, auditors, assignMap, selAuditor])
 
   // FIX: Chart dihitung dari kkData, bukan [{a:45,v:35}...] mati
   const chartData = useMemo(()=>{
@@ -258,7 +258,7 @@ export default function App(){
     let rows=[['UNIT','Kategori','TW','Asersi','Verifikasi','Selisih','Auditor','Filter: '+selUnit+'|'+selKomp+'|'+selAuditor+'|'+selTW]]
     if(activeMenu==='Kertas Kerja'){
       filteredUnits.forEach(u=>{
-        filteredKomp.forEach(komp=>{
+        filteredKategori.forEach(komp=>{
           const twList = selTW==='TW ALL' ? ['TW1','TW2','TW3','TW4'] : [selTW]
           twList.forEach(tw=>{
             const key=`${u}__${komp}__${tw}`
@@ -478,7 +478,7 @@ export default function App(){
                       const safePage = Math.min(kkPage, totalPages);
                       const startIdx = (safePage - 1) * KK_PAGE_SIZE;
                       const pageUnits = filteredUnits.slice(startIdx, startIdx + KK_PAGE_SIZE);
-                      return pageUnits.map(u=> filteredKomp.map(komp=> (selTW==='TW ALL'? ['TW1','TW2','TW3','TW4'] : [selTW]).map(tw=>{
+                      return pageUnits.map(u=> filteredKategori.map(komp=> (selTW==='TW ALL'? ['TW1','TW2','TW3','TW4'] : [selTW]).map(tw=>{
                         const key=`${u}__${komp}__${tw}`
                         const d=kkData[key]||{}
                         return (
