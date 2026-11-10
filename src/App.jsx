@@ -35,6 +35,8 @@ const AUDITORS_DATA = [
 ]
 
 const fmtRp = (n) => 'Rp' + Number(n||0).toLocaleString('id-ID');
+// Grafik: tampilkan dalam Miliar biar tidak triliunan, misal Rp 274.100.553.872 -> 274,1 M
+const fmtMiliar = (n) => { const v = Number(n||0)/1000000000; return v.toLocaleString('id-ID',{minimumFractionDigits:1, maximumFractionDigits:1}) + ' M'; };
 
 export default function App(){
   const [search,setSearch]=useState('')
@@ -430,18 +432,18 @@ export default function App(){
               </div>
 
               <div className="chart-grid">
-                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Asersi vs Verifikasi per Kategori A-E • {selTW}</div>
+                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'4px'}}>Asersi vs Verifikasi per Kategori A-E • {selTW}</div><div style={{fontSize:'10px',color:'#64748b',marginBottom:'16px'}}>Angka dalam Miliar (M) — arahkan kursor ke angka/bar untuk lihat nilai penuh Rp</div>
                   <div className="bar-row">
                     {chartData.map((d,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar1" style={{height:(maxChart>0? (d.a/maxChart*100):0)+'%'}}></div><div className="bar2" style={{height:(maxChart>0? (d.v/maxChart*100):0)+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
+                      <div key={i} className="bar-col"><div style={{display:'flex',gap:'4px',justifyContent:'center',width:'100%',fontSize:'10px',fontWeight:'600',lineHeight:'1.3'}}><span title={fmtRp(d.a)} style={{color:'#1e293b'}}>{fmtMiliar(d.a)}</span><span style={{color:'#cbd5e1'}}>|</span><span title={fmtRp(d.v)} style={{color:'#3b82f6'}}>{fmtMiliar(d.v)}</span></div><div className="bars"><div className="bar1" title={'Asersi: '+fmtRp(d.a)} style={{height:(maxChart>0? (d.a/maxChart*100):0)+'%'}}></div><div className="bar2" title={'Verifikasi: '+fmtRp(d.v)} style={{height:(maxChart>0? (d.v/maxChart*100):0)+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px'}}><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#1e293b',borderRadius:'2px'}}></div><span style={{fontSize:'11px'}}>Asersi</span></div><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#3b82f6',borderRadius:'2px'}}></div><span style={{fontSize:'11px',color:'#3b82f6'}}>Verifikasi</span></div></div>
                 </div>
-                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Total Selisih per Kategori • {selUnit}</div>
+                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'4px'}}>Total Selisih per Kategori • {selUnit}</div><div style={{fontSize:'10px',color:'#64748b',marginBottom:'16px'}}>Angka dalam Miliar (M)</div>
                   <div className="bar-row">
                     {chartData.map((d,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar-single" style={{height: d.selisih>0 ? (d.selisih/maxChart*100)+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
+                      <div key={i} className="bar-col"><div title={fmtRp(d.selisih)} style={{fontSize:'10px',fontWeight:'600',color:'#2563eb'}}>{fmtMiliar(d.selisih)}</div><div className="bars"><div className="bar-single" title={'Selisih: '+fmtRp(d.selisih)} style={{height: d.selisih>0 ? (d.selisih/maxChart*100)+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{height:'20px'}}></div>
