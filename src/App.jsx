@@ -18,8 +18,8 @@ async function saveViaProxy(table, rows) {
 
 const UNITS = ["UID Jaya","UID Jabar","UID NTB","UID NTT","PLN NP","UIK Dwipantara","Pusdiklat","Pusharlis","Pusmanpro","Puslitbang","PLN E","UID Kalbar","Kantor Pusat","Ex Pembangkit","PLN Batam","UID Banten","UID S2JB","UIW Babel","UID Lampung","Nusa Daya","UID Sumut","UID RKR","UID Kaltimra","PLN EMI","UID Jatim","UID Jateng","Pusertif","PLN EPI","UIP3B Sumatera","UIP3B Kalimantan","UIP3B Sulawesi","UP2B Jamali","PLN MCTN","UIT JBB","UIT JBT","UIT JBTB","ES","UID Kalselteng","UID Sulselrabar","UID Sulutenggo","PLN IP","UID Bali","UID MMU","UID P2B","PLN Icon","UID DIY","UIK TJB","UID Sumbar","UID NAD"]
 
-const KOMPONEN_LIST = ['Komponen A','Komponen B','Komponen C','Komponen D','Komponen E']
-const KOMPONEN_SHORT = ['Komp A','Komp B','Komp C','Komp D','Komp E']
+const KOMPONEN_LIST = ['Kategori A','Kategori B','Kategori C','Kategori D','Kategori E']
+const KOMPONEN_SHORT = ['Kategori A','Kategori B','Kategori C','Kategori D','Kategori E']
 
 // Fallback doang kalo Supabase kosong / offline. Tampilan pake auditors dari Supabase, bukan ini.
 const AUDITORS_DATA = [
@@ -39,7 +39,7 @@ const fmtRp = (n) => 'Rp' + Number(n||0).toLocaleString('id-ID');
 export default function App(){
   const [search,setSearch]=useState('')
   const [selUnit,setSelUnit]=useState('Semua Unit')
-  const [selKomp,setSelKomp]=useState('Semua Komponen')
+  const [selKomp,setSelKomp]=useState('Semua Kategori')
   const [selAuditor,setSelAuditor]=useState('Semua Auditor')
   const [selTW,setSelTW]=useState('TW3')
   const [selAvg,setSelAvg]=useState('Avg 0%')
@@ -84,13 +84,14 @@ export default function App(){
         const map = {};
         kertas.forEach(row => {
           // FIX: id dari hub = "UID Jaya__A" atau "UID Jaya__A__TW3"
-          // UI Vite pake kunci "UID Jaya__Komponen A__TW3", jadi harus dikonversi
+          // UI Vite pake kunci "UID Jaya__Kategori A__TW3", jadi harus dikonversi
           const parts = (row.id || '').split('__');
           const unitPart = parts[0];
           let kompShort = parts[1] || 'A';
-          if (kompShort.startsWith('Komponen ')) kompShort = kompShort.replace('Komponen ', '');
+          if (kompShort.startsWith('Kategori ')) kompShort = kompShort.replace('Kategori ', '');
+          if (kompShort.startsWith('Kategori ')) kompShort = kompShort.replace('Kategori ', '');
           const twPart = (parts[2] && parts[2].startsWith('TW')) ? parts[2] : 'TW3';
-          const id = `${unitPart}__Komponen ${kompShort}__${twPart}`;
+          const id = `${unitPart}__Kategori ${kompShort}__${twPart}`;
           map[id] = { asersi: Number(row.asersi || 0), verifikasi: Number(row.verifikasi || 0) };
         });
         setKkData(map);
@@ -122,8 +123,8 @@ export default function App(){
     return list
   },[units,search,selUnit,selAuditor,assignMap])
 
-  const filteredKomp = useMemo(()=>{
-    if(selKomp==='Semua Komponen') return KOMPONEN_LIST
+  const filteredKategori = useMemo(()=>{
+    if(selKomp==='Semua Kategori') return KOMPONEN_LIST
     return [selKomp]
   },[selKomp])
 
@@ -184,7 +185,7 @@ export default function App(){
     const selisih = asersi - verifikasi;
     // RUMUS BENAR: per sel, selesai = verifikasi terisi (verifikasi>0) ATAU asersi=0 & verifikasi=0.
     // BUKAN verifikasi dibagi asersi angkanya. Angka Rp-nya tidak dipakai buat %.
-    // Per auditor: % per Komponen A-E dulu, lalu rata-rata 5 komponen.
+    // Per auditor: % per Kategori A-E dulu, lalu rata-rata 5 komponen.
     // Overall = rata-rata % semua auditor (bobot sama, unit yang tidak di-assign tidak ikut).
     const unitDone = filteredUnits.filter(u=>{
       // unit dianggap selesai kalo semua komponen di TW yang dipilih selesai
@@ -252,7 +253,7 @@ export default function App(){
   },[chartData]);
 
   const downloadExcel=()=>{
-    let rows=[['UNIT','Komponen','TW','Asersi','Verifikasi','Selisih','Auditor','Filter: '+selUnit+'|'+selKomp+'|'+selAuditor+'|'+selTW]]
+    let rows=[['UNIT','Kategori','TW','Asersi','Verifikasi','Selisih','Auditor','Filter: '+selUnit+'|'+selKomp+'|'+selAuditor+'|'+selTW]]
     if(activeMenu==='Kertas Kerja'){
       filteredUnits.forEach(u=>{
         filteredKomp.forEach(komp=>{
@@ -284,11 +285,11 @@ export default function App(){
     if(isSaving) return;
     setIsSaving(true); setSaveStatus('Menyimpan ke Supabase...');
     try{
-      // Kembalikan kunci Vite "UID Jaya__Komponen A__TW3" ke id hub "UID Jaya__A" (TW3) / "UID Jaya__A__TW1" (TW lain)
+      // Kembalikan kunci Vite "UID Jaya__Kategori A__TW3" ke id hub "UID Jaya__A" (TW3) / "UID Jaya__A__TW1" (TW lain)
       const rows = Object.entries(kkData).map(([key,d])=>{
         const parts = key.split('__');
         const unit = parts[0];
-        let kompShort = (parts[1]||'Komponen A').replace('Komponen ','');
+        let kompShort = (parts[1]||'Kategori A').replace('Kategori ','').replace('Kategori ','');
         const tw = parts[2]||'TW3';
         const id = tw==='TW3' ? `${unit}__${kompShort}` : `${unit}__${kompShort}__${tw}`;
         return { id, unit, komponen: kompShort, asersi: Number(d.asersi||0), verifikasi: Number(d.verifikasi||0) };
@@ -408,7 +409,7 @@ export default function App(){
           <button className="hamburger" onClick={()=>setShowSidebar(true)}>☰</button>
           <div style={{position:'relative'}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari UID Jaya" className="search"/><span style={{position:'absolute',left:'8px',top:'7px',color:'#94a3b8',fontSize:'12px'}}>⌕</span></div>
           <select value={selUnit} onChange={e=>setSelUnit(e.target.value)} className="pill"><option>Semua Unit</option>{units.map(u=><option key={u}>{u}</option>)}</select>
-          <select value={selKomp} onChange={e=>setSelKomp(e.target.value)} className="pill"><option>Semua Komponen</option>{KOMPONEN_LIST.map(k=><option key={k}>{k}</option>)}</select>
+          <select value={selKomp} onChange={e=>setSelKomp(e.target.value)} className="pill"><option>Semua Kategori</option>{KOMPONEN_LIST.map(k=><option key={k}>{k}</option>)}</select>
           <select value={selAuditor} onChange={e=>setSelAuditor(e.target.value)} className="pill"><option>Semua Auditor</option>{auditors.map(a=><option key={a.name}>{a.name}</option>)}</select>
           <div style={{display:'flex',background:'#f1f5f9',borderRadius:'999px',padding:'4px'}}>
             {['TW ALL','TW1','TW2','TW3','TW4'].map(t=><button key={t} onClick={()=>setSelTW(t)} className={`pill ${selTW===t?'pill-black':''}`} style={{border:'none',background:selTW===t?'black':'transparent',color:selTW===t?'white':'#64748b'}}>{t}</button>)}
@@ -429,18 +430,18 @@ export default function App(){
               </div>
 
               <div className="chart-grid">
-                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Asersi vs Verifikasi per Komponen A-E • {selTW}</div>
+                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Asersi vs Verifikasi per Kategori A-E • {selTW}</div>
                   <div className="bar-row">
                     {chartData.map((d,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar1" style={{height:(maxChart>0? (d.a/maxChart*100):0)+'%'}}></div><div className="bar2" style={{height:(maxChart>0? (d.v/maxChart*100):0)+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
+                      <div key={i} className="bar-col"><div className="bars"><div className="bar1" style={{height:(maxChart>0? (d.a/maxChart*100):0)+'%'}}></div><div className="bar2" style={{height:(maxChart>0? (d.v/maxChart*100):0)+'%'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{display:'flex',justifyContent:'center',gap:'16px',marginTop:'16px'}}><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#1e293b',borderRadius:'2px'}}></div><span style={{fontSize:'11px'}}>Asersi</span></div><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{width:'12px',height:'12px',background:'#3b82f6',borderRadius:'2px'}}></div><span style={{fontSize:'11px',color:'#3b82f6'}}>Verifikasi</span></div></div>
                 </div>
-                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Total Selisih per Komponen • {selUnit}</div>
+                <div className="card"><div style={{fontWeight:'600',fontSize:'13px',marginBottom:'24px'}}>Total Selisih per Kategori • {selUnit}</div>
                   <div className="bar-row">
                     {chartData.map((d,i)=>(
-                      <div key={i} className="bar-col"><div className="bars"><div className="bar-single" style={{height: d.selisih>0 ? (d.selisih/maxChart*100)+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Komp '+['A','B','C','D','E'][i]}</div></div>
+                      <div key={i} className="bar-col"><div className="bars"><div className="bar-single" style={{height: d.selisih>0 ? (d.selisih/maxChart*100)+'%' : '2px'}}></div></div><div style={{fontSize:'11px',color:'#64748b'}}>{'Kategori '+['A','B','C','D','E'][i]}</div></div>
                     ))}
                   </div>
                   <div style={{height:'20px'}}></div>
