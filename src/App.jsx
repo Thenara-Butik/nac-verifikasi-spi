@@ -64,6 +64,19 @@ export default function App(){
   const [newAudNIP,setNewAudNIP]=useState('')
   // Save Kertas Kerja ke Supabase
   const [isDirty,setIsDirty]=useState(false)
+  const [lastSaveAt,setLastSaveAt]=useState(()=>{
+    try{ return localStorage.getItem('nac_last_save_v1') || '' }catch{ return '' }
+  })
+  const [lastSaveBy,setLastSaveBy]=useState(()=>{
+    try{ return localStorage.getItem('nac_last_save_by_v1') || '' }catch{ return '' }
+  })
+  const fmtLastSave = (iso) => {
+    if(!iso) return 'Belum pernah disimpan di browser ini';
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) + ', ' + d.toLocaleTimeString('id-ID');
+    }catch{ return iso; }
+  };
   const [isSaving,setIsSaving]=useState(false)
   const [saveStatus,setSaveStatus]=useState('')
   // Pagination Kertas Kerja: 25 per halaman
@@ -75,6 +88,8 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem('nac_auditors_final_v1',JSON.stringify(auditors)) },[auditors])
   useEffect(()=>{ localStorage.setItem('nac_assign_final_v1',JSON.stringify(assignMap)) },[assignMap])
   useEffect(()=>{ localStorage.setItem('nac_kk_final_v1',JSON.stringify(kkData)) },[kkData])
+  useEffect(()=>{ try{ if(lastSaveAt) localStorage.setItem('nac_last_save_v1', lastSaveAt) }catch{} },[lastSaveAt])
+  useEffect(()=>{ try{ if(lastSaveBy) localStorage.setItem('nac_last_save_by_v1', lastSaveBy) }catch{} },[lastSaveBy])
 
   useEffect(() => {
   (async () => {
@@ -83,6 +98,14 @@ export default function App(){
       if (unitsData?.length) setUnits(unitsData.map(d => d.name));
       const kertas = await fetchViaProxy('nac_kertas');
       if (kertas?.length) {
+        // GLOBAL: jam update terakhir = updated_at paling baru dari semua baris di Supabase
+        // Jadi bukan jam browser ini, tapi jam siapa pun yang terakhir klik Simpan
+        try{
+          let maxTs = '';
+          let maxBy = '';
+          kertas.forEach(r=>{ if(r.updated_at && r.updated_at > maxTs){ maxTs = r.updated_at; maxBy = r.updated_by || ''; } });
+          if(maxTs){ setLastSaveAt(maxTs); if(maxBy) setLastSaveBy(maxBy); }
+        }catch{}
         const map = {};
         kertas.forEach(row => {
           // FIX: id dari hub = "UID Jaya__A" atau "UID Jaya__A__TW3"
@@ -294,11 +317,22 @@ export default function App(){
         let kompShort = (parts[1]||'Kategori A').replace('Kategori ','').replace('Kategori ','');
         const tw = parts[2]||'TW3';
         const id = tw==='TW3' ? `${unit}__${kompShort}` : `${unit}__${kompShort}__${tw}`;
-        return { id, unit, komponen: kompShort, asersi: Number(d.asersi||0), verifikasi: Number(d.verifikasi||0) };
+        return { id, unit, komponen: kompShort, asersi: Number(d.asersi||0), verifikasi: Number(d.verifikasi||0), updated_at: new Date().toISOString(), updated_by: (selAuditor && selAuditor!=='Semua Auditor') ? selAuditor : 'Tim SPI' };
       });
       if(!rows.length) throw new Error('Tidak ada data untuk disimpan');
-      await saveViaProxy('nac_kertas', rows);
+      try{
+        await saveViaProxy('nac_kertas', rows);
+      }catch(e){
+        // Kalau kolom updated_at / updated_by belum dibuat di Supabase, coba lagi tanpa 2 kolom itu
+        // (biar Save tetap jalan, jam global-nya baru aktif setelah SQL ALTER TABLE dijalankan)
+        if(String(e.message).includes('updated_at') || String(e.message).includes('updated_by') || String(e.message).includes('column')){
+          const rowsNoMeta = rows.map(({updated_at, updated_by, ...rest})=>rest);
+          await saveViaProxy('nac_kertas', rowsNoMeta);
+        } else throw e;
+      }
       setIsDirty(false);
+      setLastSaveAt(new Date().toISOString());
+      setLastSaveBy((selAuditor && selAuditor!=='Semua Auditor') ? selAuditor : 'Tim SPI');
       setSaveStatus('✅ Tersimpan ke Supabase — ' + new Date().toLocaleTimeString('id-ID') + ' • ' + rows.length + ' baris');
     }catch(e){
       setSaveStatus('❌ Gagal simpan: ' + e.message + ' — data masih aman di browser ini');
@@ -397,6 +431,7 @@ export default function App(){
             <div style={{fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>{units.length} Unit • {auditors.length} Auditor</div>
             <div style={{fontSize:'11px',fontWeight:'600',marginTop:'4px'}}>{filteredUnits.length} Unit • {filteredAuditors.length} Auditor</div>
             <div style={{height:'4px',background:'rgba(255,255,255,0.1)',borderRadius:'999px',marginTop:'8px'}}><div style={{height:'4px',width:'40%',background:'rgba(255,255,255,0.3)',borderRadius:'999px'}}></div></div>
+            <div style={{marginTop:'10px',paddingTop:'10px',borderTop:'1px solid rgba(255,255,255,0.1)'}}><div style={{fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>Terakhir update Kertas Kerja (Global)</div><div style={{fontSize:'11px',fontWeight:'600',marginTop:'2px'}}>{fmtLastSave(lastSaveAt)}</div>{lastSaveBy ? <div style={{fontSize:'10px',color:'rgba(255,255,255,0.5)',marginTop:'2px'}}>Oleh: {lastSaveBy}</div> : null}<div style={{fontSize:'10px',color:isDirty?'#fbbf24':'rgba(255,255,255,0.4)',marginTop:'2px'}}>{isDirty ? '● Ada perubahan belum disimpan' : '● Sudah tersimpan'}</div></div>
 
           </div>
         </div>
