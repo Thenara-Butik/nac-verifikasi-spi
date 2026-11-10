@@ -465,7 +465,7 @@ export default function App(){
 
           {activeMenu==='Kertas Kerja' && (
             <div className="card" style={{padding:'0',overflow:'hidden'}}>
-              <div style={{padding:'16px',borderBottom:'1px solid #e9ecf1',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}><div style={{fontWeight:'600',fontSize:'14px'}}>Kertas Kerja — {selTW} • {filteredUnits.length} Unit • {selKomp} • {selAuditor}</div><div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}><span style={{fontSize:'11px',color:isDirty?'#d97706':'#059669'}}>{saveStatus || (isDirty ? '● Ada perubahan belum disimpan' : 'Semua tersimpan')}</span><button onClick={saveKkToSupabase} disabled={isSaving} className="btn btn-primary" style={{opacity:isSaving?0.6:1}}>{isSaving?'⏳ Menyimpan...':'💾 Simpan Kertas Kerja'}</button><button onClick={downloadExcel} className="btn">⬇ Download Excel ({filteredUnits.length} unit)</button></div></div>
+              <div style={{padding:'16px',borderBottom:'1px solid #e9ecf1',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',flexWrap:'wrap'}}><div style={{fontWeight:'600',fontSize:'14px'}}>Kertas Kerja — {selTW} • {filteredUnits.length} Unit • {selKomp} • {selAuditor}</div><div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}><button onClick={saveKkToSupabase} disabled={isSaving} className="btn btn-primary" style={{opacity:isSaving?0.6:1}}>{isSaving?'⏳ Menyimpan...':'💾 Simpan Kertas Kerja'}</button><button onClick={downloadExcel} className="btn">⬇ Download Excel ({filteredUnits.length} unit)</button></div></div>
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>UNIT (klik filter)</th><th>KOMP</th><th>TW</th><th style={{textAlign:'right'}}>A-ASR</th><th style={{textAlign:'right'}}>A-VER</th><th style={{textAlign:'right'}}>A-SEL</th><th>AUDITOR (filter aktif)</th></tr></thead>
@@ -499,7 +499,7 @@ export default function App(){
                       <div style={{fontSize:'11px',color:'#64748b'}}>Menampilkan {filteredUnits.length===0?0:startIdx+1}-{endIdx} dari {filteredUnits.length} unit • 25 per halaman</div>
                       <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}}>
                         <button onClick={saveKkToSupabase} disabled={isSaving} className="btn btn-primary" style={{opacity:isSaving?0.6:1}}>{isSaving?'⏳ Menyimpan...':'💾 Simpan Kertas Kerja'}</button>
-                        <span style={{fontSize:'11px',color:isDirty?'#d97706':'#059669'}}>{saveStatus}</span>
+                        
                         <button className="btn" disabled={safePage<=1} onClick={()=>setKkPage(safePage-1)} style={{opacity:safePage<=1?0.5:1}}>‹ Sebelumnya</button>
                         <span style={{fontSize:'11px',color:'#334155'}}>Halaman {safePage} dari {totalPages}</span>
                         <button className="btn" disabled={safePage>=totalPages} onClick={()=>setKkPage(safePage+1)} style={{opacity:safePage>=totalPages?0.5:1}}>Berikutnya ›</button>
